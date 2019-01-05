@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>three.js webgl - shaders - ocean</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <style>
+    body {
+      color: #cccccc;
+      font-family: Monospace;
+      font-size: 13px;
+      text-align: center;
+      background-color: #000000;
+      margin: 0px;
+      overflow: hidden;
+    }
+
+    #info {
+      position: absolute;
+      top: 0px;
+      width: 100%;
+      text-align: center;
+      padding: 5px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="container"></div>
+
+  <script src="js/three.js"></script>
+
+  <script src="js/OrbitControls.js"></script>
+  <script src="js/Water.js"></script>
+  <script src="js/Sky.js"></script>
+  <script src="js/GLTFLoader.js"></script>
+
+  <script src="js/Detector.js"></script>
+  <script src="js/stats.min.js"></script>
+  <script src="js/dat.gui.min.js"></script>
+
+  <script>
+    var group;
+    var container, stats;
+    var particlesData = [];
+    var camera, scene, renderer;
+    var light;
+    var positions, colors;
+    var particles;
+    var pointCloud;
+    var particlePositions;
+    var linesMesh;
+    var maxParticleCount = 1000;
+    var particleCount = 500;
+    var r = 800;
+    var rHalf = r / 2;
+    var effectController = {
+      showDots: false,
+      showLines: false,
+      minDistance: 100,
+      limitConnections: false,
+      maxConnections: 20,
+      particleCount: 500
+    };
+// sphere
+    var mirrorSphere, mirrorSphereCamera; // for mirror material
+
+    var audio;
+
+    init();
+    animate();
+//gui
+    function initGUI() {
+      var gui = new dat.GUI();
+      gui.add(effectController, "showDots").onChange(function(value) {
+        pointCloud.visible = value;
+      });
+      gui.add(effectController, "showLines").onChange(function(value) {
+        linesMesh.visible = value;
+      });
+      gui.add(effectController, "minDistance", 10, 300);
+      gui.add(effectController, "limitConnections");
+      gui.add(effectController, "maxConnections", 0, 30, 1);
+      gui.add(effectController, "particleCount", 0, maxParticleCount, 1).onChange(function(value) {
+        particleCount = parseInt(value);
+        particles.setDrawRange(0, particleCount);
+      });
+    }
+//initialize
+    function init() {
+      initGUI();
+      container = document.getElementById('container');
+      //camera
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 4000);
+      camera.position.set(30, 30, 100);
+      //controls
+      var controls = new THREE.OrbitControls(camera, container);
+      controls.maxPolarAngle = Math.PI * 0.495;
+      controls.target.set(0, 10, 0);
+      controls.minDistance = 40.0;
+      controls.maxDistance = 200.0;
+      camera.lookAt(controls.target);
+      //scene add
+      scene = new THREE.Scene();
+      //sphere environment add
+      sceneCube = new THREE.Scene();
+      //create group
+      group = new THREE.Group();
+      scene.add(group);
+
+      //textures
+
+
+
+
+      var helper = new THREE.BoxHelper(new THREE.Mesh(new THREE.BoxBufferGeometry(r, r, r)));
+      helper.material.color.setHex(0x080808);
+      helper.material.blending = THREE.AdditiveBlending;
+      helper.material.transparent = true;
+      //group.add( helper );
+      var segments = maxParticleCount * maxParticleCount;
+      positions = new Float32Array(segments * 3);
+      colors = new Float32Array(segments * 3);
+      var pMaterial = new THREE.PointsMaterial({
+        color: 0xFFFFFF,
+        size: 3,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        sizeAttenuation: false
+      });
+      particles = new THREE.BufferGeometry();
+      particlePositions = new Float32Array(maxParticleCount * 3);
+      for (var i = 0; i < maxParticleCount; i++) {
+        var x = Math.random() * r - r / 2;
+        var y = Math.random() * r - r / 2;
+        var z = Math.random() * r - r / 2;
+        particlePositions[i * 3] = x;
+        particlePositions[i * 3 + 1] = y;
+        particlePositions[i * 3 + 2] = z;
+        // add it to the geometry
+        particlesData.push({
+          velocity: new THREE.Vector3(-1 + Math.random() * 2, -1 + Math.random() * 2, -1 + Math.random() * 2),
+          numConnections: 0
+        });
+      }
+      particles.setDrawRange(0, particleCount);
+      particles.addAttribute('position', new THREE.BufferAttribute(particlePositions, 3).setDynamic(true));
+      // create the particle system
+      pointCloud = new THREE.Points(particles, pMaterial);
+      group.add(pointCloud);
+      var geometry = new THREE.BufferGeometry();
+      geometry.addAttribute('position', new THREE.BufferAttribute(positions, 3).setDynamic(true));
+      geometry.addAttribute('color', new THREE.BufferAttribute(colors, 3).setDynamic(true));
+      geometry.computeBoundingSphere();
+      geometry.setDrawRange(0, 0);
+      var material = new THREE.LineBasicMaterial({
+        vertexColors: THREE.VertexColors,
+        blending: THREE.AdditiveBlending,
+        transparent: false
+      });
+      linesMesh = new THREE.LineSegments(geometry, material);
+      group.add(linesMesh);
+
+      renderer = new THREE.WebGLRenderer();
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.gammaInput = true;
+      renderer.gammaOutput = true;
+      container.appendChild(renderer.domElement);
+
+      //light
+      light = new THREE.DirectionalLight(0xffffff, 0.8);
+      scene.add(light);
+      // Water
+      var waterGeometry = new THREE.PlaneBufferGeometry(10000, 10000);
+      water = new THREE.Water(
+        waterGeometry, {
+          textureWidth: 512,
+          textureHeight: 512,
+          waterNormals: new THREE.TextureLoader().load('textures/waternormals.jpg', function(texture) {
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+          }),
+          alpha: 1.0,
+          sunDirection: light.position.clone().normalize(),
+          sunColor: 0xffffff,
+          waterColor: 0x001e0f,
+          distortionScale: 3.0,
+          fog: scene.fog !== undefined
+        }
+      );
+      water.rotation.x = -Math.PI / 2;
+      scene.add(water);
+
+
+
+      // Skybox
+      var sky = new THREE.Sky();
+      sky.scale.setScalar(10000);
+      scene.add(sky);
+      var uniforms = sky.material.uniforms;
+      uniforms.turbidity.value = 10;
+      uniforms.rayleigh.value = 2;
+      uniforms.luminance.value = 1;
+      uniforms.mieCoefficient.value = 0.005;
+      uniforms.mieDirectionalG.value = 0.8;
+      var parameters = {
+        distance: 400,
+        inclination: 0.4654,
+        azimuth: 0.7655
+      };
+      var cubeCamera = new THREE.CubeCamera(1, 20000, 256);
+      cubeCamera.renderTarget.texture.minFilter = THREE.LinearMipMapLinearFilter;
+
+      function updateSun() {
+        var theta = Math.PI * (parameters.inclination - 0.5);
+        var phi = 2 * Math.PI * (parameters.azimuth - 0.5);
+        light.position.x = parameters.distance * Math.cos(phi);
+        light.position.y = parameters.distance * Math.sin(phi) * Math.sin(theta);
+        light.position.z = parameters.distance * Math.sin(phi) * Math.cos(theta);
+        sky.material.uniforms.sunPosition.value = light.position.copy(light.position);
+        water.material.uniforms.sunDirection.value.copy(light.position).normalize();
+        cubeCamera.update(renderer, scene);
+      }
+      updateSun();
+
+      //
+
+      //
+      stats = new Stats();
+      container.appendChild(stats.dom);
+      // GUI
+      var gui = new dat.GUI();
+      	var folder = gui.addFolder( 'Sky' );
+      folder.add( parameters, 'inclination', 0, 0.5, 0.0001 ).onChange( updateSun );
+      folder.add( parameters, 'azimuth', 0, 1, 0.0001 ).onChange( updateSun );
+      folder.open();
+      var uniforms = water.material.uniforms;
+      var folder = gui.addFolder( 'Water' );
+      folder.add( uniforms.distortionScale, 'value', 0, 8, 0.1 ).name( 'distortionScale' );
+      folder.add( uniforms.size, 'value', 0.1, 10, 0.1 ).name( 'size' );
+      folder.add( uniforms.alpha, 'value', 0.9, 1, .001 ).name( 'alpha' );
+      folder.open();
+      //
+
+      var sphereGeom =  new THREE.SphereGeometry( 10, 32, 16 ); // radius, segmentsWidth, segmentsHeight
+      mirrorSphereCamera = new THREE.CubeCamera( 0.1, 5000, 512 );
+      mirrorSphereCamera.renderTarget.minFilter = THREE.LinearMipMapLinearFilter;
+      scene.add( mirrorSphereCamera );
+      var mirrorSphereMaterial = new THREE.MeshBasicMaterial( { envMap: mirrorSphereCamera.renderTarget } );
+      mirrorSphere = new THREE.Mesh( sphereGeom, mirrorSphereMaterial );
+      mirrorSphere.position.set(0,10,0);
+      mirrorSphereCamera.position = mirrorSphere.position;
+      //scene.add(mirrorSphere);
+
+      var girlmaterial = new THREE.MeshNormalMaterial();
+      girlmaterial.onBeforeCompile = function ( shader ) {
+        shader.uniforms.time = { value: 0 };
+        shader.vertexShader = 'uniform float time;\n' + shader.vertexShader;
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <begin_vertex>',
+          [
+            'float theta = sin( time + position.y ) / 100000.0;',
+            'float c = cos( theta );',
+            'float s = sin( theta );',
+            'mat3 m = mat3( c, 0, s, 0, 1, 0, +s, 0, c );',
+            'vec3 transformed = vec3( position ) * m ;',
+            'vNormal = vNormal * m;'
+          ].join( '\n' )
+        );
+        materialShader = shader;
+      };
+
+
+      var loader = new THREE.GLTFLoader();
+      loader.load( 'models/woman_sitting.gltf', function ( gltf ) {
+        var mesh = new THREE.Mesh( gltf.scene.children[ 0 ].geometry, girlmaterial );
+        mesh.position.y = -16;
+        mesh.scale.setScalar( 0.25 );
+        scene.add( mesh );
+        				} );
+
+      window.addEventListener('resize', onWindowResize, false);
+    };
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+      var vertexpos = 0;
+      var colorpos = 0;
+      var numConnected = 0;
+      for (var i = 0; i < particleCount; i++)
+        particlesData[i].numConnections = 0;
+      for (var i = 0; i < particleCount; i++) {
+        // get the particle
+        var particleData = particlesData[i];
+        particlePositions[i * 3] += particleData.velocity.x;
+        particlePositions[i * 3 + 1] += particleData.velocity.y;
+        particlePositions[i * 3 + 2] += particleData.velocity.z;
+        if (particlePositions[i * 3 + 1] < -rHalf || particlePositions[i * 3 + 1] > rHalf)
+          particleData.velocity.y = -particleData.velocity.y;
+        if (particlePositions[i * 3] < -rHalf || particlePositions[i * 3] > rHalf)
+          particleData.velocity.x = -particleData.velocity.x;
+        if (particlePositions[i * 3 + 2] < -rHalf || particlePositions[i * 3 + 2] > rHalf)
+          particleData.velocity.z = -particleData.velocity.z;
+        if (effectController.limitConnections && particleData.numConnections >= effectController.maxConnections)
+          continue;
+        // Check collision
+        for (var j = i + 1; j < particleCount; j++) {
+          var particleDataB = particlesData[j];
+          if (effectController.limitConnections && particleDataB.numConnections >= effectController.maxConnections)
+            continue;
+          var dx = particlePositions[i * 3] - particlePositions[j * 3];
+          var dy = particlePositions[i * 3 + 1] - particlePositions[j * 3 + 1];
+          var dz = particlePositions[i * 3 + 2] - particlePositions[j * 3 + 2];
+          var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (dist < effectController.minDistance) {
+            particleData.numConnections++;
+            particleDataB.numConnections++;
+            var alpha = 1.0 - dist / effectController.minDistance;
+            positions[vertexpos++] = particlePositions[i * 3];
+            positions[vertexpos++] = particlePositions[i * 3 + 1];
+            positions[vertexpos++] = particlePositions[i * 3 + 2];
+            positions[vertexpos++] = particlePositions[j * 3];
+            positions[vertexpos++] = particlePositions[j * 3 + 1];
+            positions[vertexpos++] = particlePositions[j * 3 + 2];
+            colors[colorpos++] = alpha;
+            colors[colorpos++] = alpha;
+            colors[colorpos++] = alpha;
+            colors[colorpos++] = alpha;
+            colors[colorpos++] = alpha;
+            colors[colorpos++] = alpha;
+            numConnected++;
+          }
+        }
+      }
+      linesMesh.geometry.setDrawRange(0, numConnected * 2);
+      linesMesh.geometry.attributes.position.needsUpdate = true;
+      linesMesh.geometry.attributes.color.needsUpdate = true;
+      pointCloud.geometry.attributes.position.needsUpdate = true;
+
+      requestAnimationFrame(animate);
+      stats.update();
+      render();
+    }
+
+    function render() {
+      var time = Date.now() * 0.001;
+      group.rotation.y = time * 0.1;
+      mirrorSphere.rotation.y = time * 0.1;
+      water.material.uniforms.time.value += 1.0 / 60.0;
+
+      mirrorSphere.visible = false;
+      mirrorSphereCamera.updateCubeMap( renderer, scene );
+      mirrorSphere.visible = true;
+
+
+      renderer.render(scene, camera);
+    }
+  </script>
+
+</body>
+
+</html>
