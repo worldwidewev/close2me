@@ -77,8 +77,6 @@
   <script src="js/DRACOLoader.js"></script>
 
   <script>
-
-
     window.addEventListener("load", function() {
       const loader = document.querySelector(".loader");
       loader.className += " hidden";
@@ -99,8 +97,10 @@
     var rHalf = r / 2;
 
     THREE.DRACOLoader.setDecoderPath('js/draco/');
-THREE.DRACOLoader.setDecoderConfig({ type: 'js' });
-var dracoLoader = new THREE.DRACOLoader();
+    THREE.DRACOLoader.setDecoderConfig({
+      type: 'js'
+    });
+    var dracoLoader = new THREE.DRACOLoader();
 
     init();
     animate();
@@ -195,28 +195,29 @@ var dracoLoader = new THREE.DRACOLoader();
       container.appendChild(stats.dom);
       // GUI
       var gui = new dat.GUI();
-      	var folder = gui.addFolder( 'Sky' );
-      folder.add( parameters, 'inclination', 0, 0.5, 0.0001 ).onChange( updateSun );
-      folder.add( parameters, 'azimuth', 0, 1, 0.0001 ).onChange( updateSun );
+      var folder = gui.addFolder('Sky');
+      folder.add(parameters, 'inclination', 0, 0.5, 0.0001).onChange(updateSun);
+      folder.add(parameters, 'azimuth', 0, 1, 0.0001).onChange(updateSun);
       folder.open();
       var uniforms = water.material.uniforms;
-      var folder = gui.addFolder( 'Water' );
-      folder.add( uniforms.distortionScale, 'value', 0, 8, 0.1 ).name( 'distortionScale' );
-      folder.add( uniforms.size, 'value', 0.1, 10, 0.1 ).name( 'size' );
-      folder.add( uniforms.alpha, 'value', 0.9, 1, .001 ).name( 'alpha' );
+      var folder = gui.addFolder('Water');
+      folder.add(uniforms.distortionScale, 'value', 0, 8, 0.1).name('distortionScale');
+      folder.add(uniforms.size, 'value', 0.1, 10, 0.1).name('size');
+      folder.add(uniforms.alpha, 'value', 0.9, 1, .001).name('alpha');
       folder.open();
       //
 
-      var sphereGeom =  new THREE.SphereGeometry( 10, 32, 16 ); // radius, segmentsWidth, segmentsHeight
-      mirrorSphereCamera = new THREE.CubeCamera( 0.1, 5000, 512 );
+      var sphereGeom = new THREE.SphereGeometry(10, 32, 16); // radius, segmentsWidth, segmentsHeight
+      mirrorSphereCamera = new THREE.CubeCamera(0.1, 5000, 512);
       mirrorSphereCamera.renderTarget.minFilter = THREE.LinearMipMapLinearFilter;
-      scene.add( mirrorSphereCamera );
-      var mirrorSphereMaterial = new THREE.MeshBasicMaterial( { envMap: mirrorSphereCamera.renderTarget } );
-      mirrorSphere = new THREE.Mesh( sphereGeom, mirrorSphereMaterial );
-      mirrorSphere.position.set(0,10,0);
+      scene.add(mirrorSphereCamera);
+      var mirrorSphereMaterial = new THREE.MeshBasicMaterial({
+        envMap: mirrorSphereCamera.renderTarget
+      });
+      mirrorSphere = new THREE.Mesh(sphereGeom, mirrorSphereMaterial);
+      mirrorSphere.position.set(0, 10, 0);
       mirrorSphereCamera.position = mirrorSphere.position;
       //scene.add(mirrorSphere);
->>>>>>> parent of ab1810b... no gui or stats
 
       var girlmaterial = new THREE.MeshNormalMaterial();
 
