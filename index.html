@@ -193,19 +193,7 @@
       //
       stats = new Stats();
       container.appendChild(stats.dom);
-      // GUI
-      var gui = new dat.GUI();
-      var folder = gui.addFolder('Sky');
-      folder.add(parameters, 'inclination', 0, 0.5, 0.0001).onChange(updateSun);
-      folder.add(parameters, 'azimuth', 0, 1, 0.0001).onChange(updateSun);
-      folder.open();
-      var uniforms = water.material.uniforms;
-      var folder = gui.addFolder('Water');
-      folder.add(uniforms.distortionScale, 'value', 0, 8, 0.1).name('distortionScale');
-      folder.add(uniforms.size, 'value', 0.1, 10, 0.1).name('size');
-      folder.add(uniforms.alpha, 'value', 0.9, 1, .001).name('alpha');
-      folder.open();
-      //
+
 
       var sphereGeom = new THREE.SphereGeometry(10, 32, 16); // radius, segmentsWidth, segmentsHeight
       mirrorSphereCamera = new THREE.CubeCamera(0.1, 5000, 512);
